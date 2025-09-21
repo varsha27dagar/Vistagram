@@ -1,14 +1,14 @@
 {
   "files": {
     "main.css": "/Vistagram/static/css/main.942b2c92.css",
-    "main.js": "/Vistagram/static/js/main.0522ca42.js",
+    "main.js": "/Vistagram/static/js/main.91c82150.js",
     "service-worker.js": "/Vistagram/service-worker.js",
     "index.html": "/Vistagram/index.html",
     "main.942b2c92.css.map": "/Vistagram/static/css/main.942b2c92.css.map",
-    "main.0522ca42.js.map": "/Vistagram/static/js/main.0522ca42.js.map"
+    "main.91c82150.js.map": "/Vistagram/static/js/main.91c82150.js.map"
   },
   "entrypoints": [
     "static/css/main.942b2c92.css",
-    "static/js/main.0522ca42.js"
+    "static/js/main.91c82150.js"
   ]
 }
