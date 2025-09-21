@@ -1,8 +1,7 @@
-// src/components/PostForm.js
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Camera } from 'lucide-react';
-import { useCamera } from '../hooks/useCamera';
+import { useCamera } from '../hooks/useCamera'; // Assuming useCamera is correctly implemented to return what's needed
 import { buttonHover, buttonTap } from '../utils/framerMotionVariants';
 
 /**
@@ -22,15 +21,18 @@ const PostForm = ({ onSubmit, showToast }) => {
   const {
     videoRef,
     canvasRef,
-    capturedImage,
-    setCapturedImage, // This can be used for both camera and file uploads
+    capturedImage: cameraCapturedImage, // Rename to avoid conflict with local state for uploaded image
+    setCapturedImage: setCameraCapturedImage, // Rename to avoid conflict
     startCamera,
     stopCamera,
     capturePhoto,
-    clearCapturedImage
+    clearCapturedImage: clearCameraCapturedImage // Rename to avoid conflict
   } = useCamera();
 
-  // Handle switching tabs and camera lifecycle
+  // Unified state for the image currently being displayed/prepared for post
+  const [displayImage, setDisplayImage] = useState(null);
+
+  // Effect to manage camera lifecycle and update displayImage
   useEffect(() => {
     if (activeTab === "camera") {
       const cameraStarted = startCamera();
@@ -38,22 +40,29 @@ const PostForm = ({ onSubmit, showToast }) => {
         showToast("Could not access camera. Please ensure permissions are granted.", "error");
         setActiveTab("upload"); // Fallback to upload if camera fails
       }
-    } else {
-      stopCamera();
-      // Only clear capturedImage if it came from the camera, not from an upload
-      if (capturedImage && !capturedImage.startsWith('data:image')) { // Simple check, could be more robust
-         clearCapturedImage();
-      }
-    }
-    // Clear image when switching tabs, unless it's already an uploaded image being kept
-    if (activeTab === "upload" && capturedImage && capturedImage.startsWith('blob:')) {
-      clearCapturedImage(); // Clear any previous camera capture when going to upload
-    }
-    if (activeTab === "camera" && capturedImage && !capturedImage.startsWith('blob:')) {
-        setCapturedImage(null); // Clear any previous upload when going to camera
+      // When switching to camera, clear any previously uploaded image
+      setDisplayImage(null);
+      clearCameraCapturedImage(); // Ensure the camera hook's state is also clear
+    } else { // activeTab === "upload"
+      stopCamera(); // Stop camera when not in camera tab
+      // When switching to upload, clear any previously captured camera image
+      setDisplayImage(null);
+      clearCameraCapturedImage(); // Ensure the camera hook's state is also clear
     }
 
-  }, [activeTab, startCamera, stopCamera, clearCapturedImage, showToast, capturedImage, setCapturedImage]);
+    // Cleanup function for useEffect to stop camera when component unmounts or dependencies change
+    return () => {
+      stopCamera();
+    };
+  }, [activeTab, startCamera, stopCamera, showToast, clearCameraCapturedImage]);
+
+  // Effect to sync cameraCapturedImage from hook to local displayImage state
+  useEffect(() => {
+    if (activeTab === "camera" && cameraCapturedImage) {
+      setDisplayImage(cameraCapturedImage);
+    }
+  }, [cameraCapturedImage, activeTab]);
+
 
   // Handle file input change for uploads
   const handleFileChange = (event) => {
@@ -61,14 +70,24 @@ const PostForm = ({ onSubmit, showToast }) => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setCapturedImage(reader.result); // Use setCapturedImage for uploaded image too
+        setDisplayImage(reader.result); // Set uploaded image to displayImage
+        setCameraCapturedImage(reader.result); // Also set it in the camera hook's state for consistency if it's the `capturedImage` that gets submitted.
+                                              // This might be redundant depending on how `useCamera` handles `capturedImage`
+                                              // but ensures `imageToSubmit` gets the correct value.
       };
       reader.readAsDataURL(file); // Read file as Base64
     }
   };
 
+  const handleCapturePhoto = () => {
+    capturePhoto(); // This updates cameraCapturedImage in the hook
+    // The useEffect above will then update displayImage
+  };
+
+
   const handleSubmit = () => {
-    const imageToSubmit = capturedImage;
+    // The image to submit should be `displayImage` which holds either camera or uploaded image
+    const imageToSubmit = displayImage;
 
     if (!imageToSubmit || !caption.trim()) {
       showToast("Please add an image and a caption!", "error");
@@ -89,14 +108,13 @@ const PostForm = ({ onSubmit, showToast }) => {
     // Reset form state
     setCaption("");
     setTagsInput("");
-    setCapturedImage(null); // Clear image preview
-    clearCapturedImage(); // Ensure camera hook state is also cleared if camera was active
+    setDisplayImage(null); // Clear image preview
+    clearCameraCapturedImage(); // Ensure camera hook state is also cleared if camera was active
     if (fileInputRef.current) {
       fileInputRef.current.value = ''; // Clear file input
     }
   };
 
-  const displayImage = capturedImage;
 
   return (
     <div className="flex flex-col gap-4">
@@ -142,7 +160,7 @@ const PostForm = ({ onSubmit, showToast }) => {
               <canvas ref={canvasRef} className="hidden" />
               <motion.button
                 type="button"
-                onClick={capturePhoto}
+                onClick={handleCapturePhoto} // Use the new handler
                 className="px-8 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 text-white font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg text-lg"
                 whileHover={buttonHover}
                 whileTap={buttonTap}
